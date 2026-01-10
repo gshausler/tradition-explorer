@@ -388,4 +388,4 @@ const App: React.FC = () => {
             <div className="p-10 border-t bg-white">
               <div className="flex space-x-4">
                 <textarea 
-                  rows={2}
+                  rows={2}>
