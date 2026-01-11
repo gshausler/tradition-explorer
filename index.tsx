@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -70,11 +71,13 @@ const KeyIcon = ({ className }: { className?: string }) => (
 
 declare var html2pdf: any;
 declare global {
+  // Fix: defining AIStudio interface and matching Window properties to satisfy TS compiler constraints on redeclaration.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
   interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
+    readonly aistudio: AIStudio;
   }
 }
 
@@ -140,6 +143,7 @@ const App: React.FC = () => {
     if (!question || selectedTraditions.length === 0) return;
     setIsLoading(true);
     
+    // Always initialize GoogleGenAI inside the handler to use latest API key
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const traditionSchemaProperties = selectedTraditions.reduce((acc, trad) => {
       acc[trad] = { type: Type.STRING };
@@ -200,6 +204,7 @@ const App: React.FC = () => {
     const userMsg: ChatMessage = { role: 'user', text: input };
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
+    // Always initialize GoogleGenAI inside the handler to use latest API key
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const context = `Context: "${currentResult.question}". Focus: ${currentResult.selectedTraditions.join(', ')}. Data: ${JSON.stringify(currentResult.data).substring(0, 500)}`;
     const chat = ai.chats.create({ model: 'gemini-3-pro-preview', config: { systemInstruction: context } });
@@ -388,4 +393,23 @@ const App: React.FC = () => {
             <div className="p-10 border-t bg-white">
               <div className="flex space-x-4">
                 <textarea 
-                  rows={2}>
+                  rows={2} 
+                  className="flex-grow p-8 text-base border-2 border-slate-100 rounded-[2rem] outline-none focus:border-indigo-500 transition-all resize-none shadow-inner bg-white text-slate-900" 
+                  style={{ backgroundColor: 'white', color: '#0f172a' }}
+                  placeholder="Inquire further for scholarly depth..." 
+                  value={dialogueInput} 
+                  onChange={(e) => setDialogueInput(e.target.value)} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendDialogue(); } }} 
+                />
+                <button onClick={handleSendDialogue} disabled={isDialogueLoading || !dialogueInput.trim()} className="px-10 bg-indigo-600 text-white font-black uppercase text-xs tracking-[0.2em] rounded-[2rem] shadow-xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+root.render(<App />);
