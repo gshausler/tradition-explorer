@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -39,6 +38,19 @@ const TRADITIONS: Tradition[] = [
   'Catholicism', 'Islam', 'Humanism', 'Buddhism', 'Taoism', 'Hinduism'
 ];
 
+const EXAMPLE_QUERIES = [
+  "Should artificial intelligence be granted moral status or rights?",
+  "What is the most ethical approach to wealth distribution in a modern society?",
+  "Is the pursuit of individual happiness more important than collective duty?",
+  "How should a society balance religious freedom with secular laws?",
+  "What defines a 'just war' in the age of global interconnectedness?",
+  "Does the concept of 'free will' fundamentally change our view of moral responsibility?",
+  "What are the ethical implications of life-extending medical technologies?",
+  "How should we view our responsibility toward the environment and non-human life?",
+  "Is suffering an inherent part of the human condition or something to be eliminated?",
+  "What is the source of objective morality, if it exists at all?"
+];
+
 const SECTION_LABELS: Record<string, string> = {
   'summary': 'Executive Summary',
   'comparison': 'Thematic Comparison',
@@ -66,10 +78,11 @@ const KeyIcon = ({ className }: { className?: string }) => (
 const AlertIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 );
+const ChevronDown = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
+);
 
 declare var html2pdf: any;
-// Fixed: Window.aistudio must have identical modifiers to other declarations if they exist. 
-// Making it optional allows for safer integration and fixes TS identical modifier errors.
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
@@ -89,6 +102,26 @@ const CustomMarkdown: React.FC<{ content: string; isUser?: boolean }> = ({ conte
   </div>
 );
 
+const LoadingSkeleton: React.FC<{ count: number }> = ({ count }) => (
+  <div className="animate-pulse space-y-16 py-10">
+    {[1, 2].map((i) => (
+      <div key={i}>
+        <div className="h-4 bg-slate-200 rounded w-1/4 mb-10"></div>
+        <div className={`grid gap-10 ${count === 1 ? 'grid-cols-1' : count === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {Array.from({ length: count }).map((_, j) => (
+            <div key={j} className="p-12 border-2 border-slate-50 rounded-[3rem] bg-white h-96 space-y-4">
+              <div className="h-6 bg-slate-100 rounded w-3/4"></div>
+              <div className="h-4 bg-slate-50 rounded w-full"></div>
+              <div className="h-4 bg-slate-50 rounded w-5/6"></div>
+              <div className="h-4 bg-slate-50 rounded w-full"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 // --- MAIN APP ---
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(true);
@@ -103,6 +136,7 @@ const App: React.FC = () => {
   const [selectedTraditions, setSelectedTraditions] = useState<Tradition[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showDiscussion, setShowDiscussion] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
   const [dialogueInput, setDialogueInput] = useState('');
   const [isDialogueLoading, setIsDialogueLoading] = useState(false);
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
@@ -112,7 +146,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkKey = async () => {
-      // Check for presence of window.aistudio before use
       if (typeof window.aistudio !== 'undefined' && window.aistudio.hasSelectedApiKey) {
         const selected = await window.aistudio.hasSelectedApiKey();
         setHasKey(selected || (!!process.env.API_KEY && process.env.API_KEY !== "undefined"));
@@ -136,7 +169,6 @@ const App: React.FC = () => {
   const handleSelectKey = async () => {
     if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
       await window.aistudio.openSelectKey();
-      // Assume success to avoid race conditions with hasSelectedApiKey
       setHasKey(true);
     }
   };
@@ -145,8 +177,8 @@ const App: React.FC = () => {
     if (!question || selectedTraditions.length === 0) return;
     setIsLoading(true);
     setFallbackNotice(null);
+    setCurrentResult(null); 
     
-    // Always instantiate GoogleGenAI right before use to catch updated API keys
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const traditionSchemaProperties = selectedTraditions.reduce((acc, trad) => {
       acc[trad] = { type: Type.STRING };
@@ -167,7 +199,6 @@ const App: React.FC = () => {
     };
 
     try {
-      // Primary Attempt: Pro Model
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor.`,
@@ -193,7 +224,6 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.warn("Pro model failed, attempting fallback to Flash...", err);
       
-      // Handle key-related errors by re-prompting key selection
       if (err.message?.includes("Requested entity was not found") || err.message?.includes("API key not valid")) {
         setHasKey(false);
         if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
@@ -204,7 +234,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Secondary Attempt: Flash Model (Free Tier)
       try {
         const fallbackResponse = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -232,7 +261,6 @@ const App: React.FC = () => {
         setHistory(prev => [res, ...prev]);
       } catch (fallbackErr: any) {
         console.error("Analysis Error:", fallbackErr);
-        // Handle key-related errors on fallback as well
         if (fallbackErr.message?.includes("Requested entity was not found") || fallbackErr.message?.includes("API key not valid")) {
           setHasKey(false);
           if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
@@ -257,11 +285,9 @@ const App: React.FC = () => {
     const userMsg: ChatMessage = { role: 'user', text: input };
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
-    // Always instantiate GoogleGenAI right before use
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Result Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}`;
     
-    // Attempt Pro first, then Flash
     const tryDialogue = async (model: 'gemini-3-pro-preview' | 'gemini-3-flash-preview') => {
       const chat = ai.chats.create({ 
         model: model, 
@@ -320,6 +346,12 @@ const App: React.FC = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const getGridClass = (count: number) => {
+    if (count === 1) return 'grid-cols-1';
+    if (count === 2) return 'grid-cols-1 md:grid-cols-2';
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
   };
 
   if (!hasKey) {
@@ -390,8 +422,32 @@ const App: React.FC = () => {
         )}
 
         <div className="bg-white rounded-[3rem] shadow-2xl p-14 mb-14 no-print border border-slate-100">
-          <div className="mb-12">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</label>
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thematic Inquiry</label>
+              <button 
+                onClick={() => setShowExamples(!showExamples)}
+                className="flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
+              >
+                Need inspiration?
+                <ChevronDown className={`ml-2 transition-transform duration-300 ${showExamples ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+            
+            {showExamples && (
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-6 bg-slate-50 rounded-3xl animate-in fade-in slide-in-from-top-4 duration-300 border border-slate-100">
+                {EXAMPLE_QUERIES.map((ex, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => { setQuestion(ex); setShowExamples(false); }}
+                    className="text-left px-5 py-4 text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-indigo-100 hover:shadow-sm line-clamp-2"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <input 
               type="text" 
               className="w-full px-10 py-8 rounded-[2rem] border-2 border-slate-50 bg-slate-50 text-slate-900 font-bold text-xl outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
@@ -425,14 +481,17 @@ const App: React.FC = () => {
             disabled={isLoading || !question || selectedTraditions.length === 0} 
             className="w-full py-10 bg-indigo-600 text-white font-black uppercase text-base rounded-[2.5rem] shadow-2xl hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
           >
-            {isLoading ? "Consulting Archives..." : "Generate Analysis"}
+            {isLoading ? "Consulting the long beards..." : "Generate Analysis"}
           </button>
         </div>
 
         <div ref={resultsRef} className="space-y-16">
-          {currentResult ? (
+          {isLoading && <LoadingSkeleton count={selectedTraditions.length} />}
+          
+          {currentResult && !isLoading ? (
             <div className="animate-in fade-in slide-in-from-bottom-12 duration-700">
-              <div className="pdf-show mb-14 border-b-4 border-slate-900 pb-8">
+              <div className="mb-14 border-b-4 border-slate-900 pb-8">
+                <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</div>
                 <h1 className="text-5xl font-black serif mb-4">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                   Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} 
@@ -456,11 +515,11 @@ const App: React.FC = () => {
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">{SECTION_LABELS[key]}</h3>
                     <div className="h-px bg-slate-200 w-full" />
                   </div>
-                  <div className={`grid grid-cols-1 ${currentResult.selectedTraditions.length > 1 ? 'lg:grid-cols-2' : ''} xl:grid-cols-3 gap-10`}>
+                  <div className={`grid gap-10 ${getGridClass(currentResult.selectedTraditions.length)}`}>
                     {currentResult.selectedTraditions.map((tradition) => (
                       <div 
                         key={tradition} 
-                        className="flex flex-col p-12 border-2 rounded-[3rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative pdf-card"
+                        className="flex flex-col p-12 border-2 rounded-[3rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative pdf-card h-full"
                       >
                         <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
