@@ -52,18 +52,25 @@ const EXAMPLE_QUERIES = [
 ];
 
 const SECTION_LABELS: Record<string, string> = {
-  'summary': 'Executive Summary',
+  'summary': 'Concise Stance',
   'comparison': 'Thematic Comparison',
   'discussion': 'Nuanced Discussion',
-  'deep dive': 'Educational Deep Dive',
+  'deep dive': 'Foundational Logic',
   'quotes and references': 'Glossary & Resources',
   'conclusion': 'Final Synthesis'
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor. Respond ONLY in valid JSON.
 Analyze the provided question from the perspective of each selected tradition.
-Sections to provide: summary, comparison, discussion, deep dive, quotes and references, conclusion.
-Format: { "section_name": { "Tradition Name": "Markdown content..." } }`;
+
+STRICT CONTENT RULES:
+1. 'summary': Provide a MAXIMUM of 1-2 punchy, concise sentences per tradition. It should be an "elevator pitch" of their core stance.
+2. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts, definitions, or arguments already stated in previous sections.
+3. Section-Specific Focus:
+   - 'comparison': Focus strictly on how traditions differ from or align with each other.
+   - 'discussion': Explore internal debates within the tradition, historical evolution, or modern edge-cases.
+   - 'deep dive': Explain the specific metaphysical or logical framework (e.g., specific scriptures, axioms, or syllogisms) that leads to their conclusion.
+4. Format: { "section_name": { "Tradition Name": "Markdown content..." } }`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
@@ -201,7 +208,7 @@ const App: React.FC = () => {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor.`,
+        contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor and absolute lack of repetition between sections.`,
         config: {
           systemInstruction: DEFAULT_SYSTEM_PROMPT,
           responseMimeType: "application/json",
