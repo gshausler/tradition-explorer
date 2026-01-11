@@ -39,15 +39,15 @@ const TRADITIONS: Tradition[] = [
 ];
 
 const EXAMPLE_QUERIES = [
+  "Why should we forgive our enemies?",
+  "How is homosexuality viewed?",
+  "Is it ever acceptable to tell a lie for a greater good?",
+  "What are our moral obligations to our parents and elders?",
+  "What is the importance of charity and helping the poor?",
   "Should artificial intelligence be granted moral status or rights?",
-  "What is the most ethical approach to wealth distribution in a modern society?",
   "Is the pursuit of individual happiness more important than collective duty?",
-  "How should a society balance religious freedom with secular laws?",
-  "What defines a 'just war' in the age of global interconnectedness?",
+  "How should we view our responsibility toward the environment?",
   "Does the concept of 'free will' fundamentally change our view of moral responsibility?",
-  "What are the ethical implications of life-extending medical technologies?",
-  "How should we view our responsibility toward the environment and non-human life?",
-  "Is suffering an inherent part of the human condition or something to be eliminated?",
   "What is the source of objective morality, if it exists at all?"
 ];
 
@@ -398,7 +398,7 @@ const App: React.FC = () => {
           <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg">
             <HistoryIcon className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-black serif tracking-tight">Tradition Explorer</h1>
+          <h1 className="text-2xl font-black serif tracking-tight">Ethics and Traditions explorer</h1>
         </div>
         <div className="flex items-center space-x-4">
           <button 
