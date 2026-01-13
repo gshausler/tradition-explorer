@@ -12,6 +12,8 @@ type Tradition =
 
 type SectionKey = 'summary' | 'comparison' | 'discussion' | 'deep dive' | 'quotes and references' | 'conclusion';
 
+type ModelOption = 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-lite-latest';
+
 interface TraditionContent {
   [tradition: string]: string;
 }
@@ -21,16 +23,22 @@ interface ChatMessage {
   text: string;
 }
 
+interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
 interface ComparisonResult {
   id: string;
   question: string;
   selectedTraditions: Tradition[];
   timestamp: number;
-  modelUsed: 'pro' | 'flash';
+  modelUsed: string;
   data: {
     [key in SectionKey]: TraditionContent;
   };
   chatHistory?: ChatMessage[];
+  sources?: GroundingSource[];
 }
 
 const TRADITIONS: Tradition[] = [
@@ -64,20 +72,21 @@ const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor. Respond O
 Analyze the provided question from the perspective of each selected tradition.
 
 STRICT CONTENT RULES:
-1. 'summary': Provide a MAXIMUM of 1-2 punchy, concise sentences per tradition. It should be an "elevator pitch" of their core stance.
-2. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts, definitions, or arguments already stated in previous sections.
-3. Section-Specific Focus:
-   - 'comparison': Focus strictly on how traditions differ from or align with each other.
-   - 'discussion': Explore internal debates within the tradition, historical evolution, or modern edge-cases.
-   - 'deep dive': Explain the specific metaphysical or logical framework (e.g., specific scriptures, axioms, or syllogisms) that leads to their conclusion.
-4. Format: { "section_name": { "Tradition Name": "Markdown content..." } }`;
+1. 'summary': Provide a MAXIMUM of 1-2 sentences per tradition. Write this section for an 8th-grade reading level (clear, simple, no jargon). It should be an "elevator pitch" of their core stance.
+2. CITATIONS & HYPERLINKS: Every assertion or argument MUST be bolstered by a clickable Markdown hyperlink to a primary source, official text, or reputable academic encyclopedia (e.g., [Source Name](URL)). Include multiple links per tradition in every section.
+3. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts or arguments already stated in previous sections.
+4. Section-Specific Focus:
+   - 'comparison': Focus strictly on how traditions differ from or align with each other. Use links to comparative studies.
+   - 'discussion': Explore internal debates, historical evolution, or modern edge-cases. Link to modern scholarship.
+   - 'deep dive': Explain specific metaphysical/logical frameworks (scriptures, axioms). Link to the full text of scriptures or philosophical treatises.
+5. Format: { "section_name": { "Tradition Name": "Markdown content with [Hyperlinks](URL)..." } }`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
 );
 const MessageIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
 );
 const KeyIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3L15.5 7.5z"/></svg>
@@ -87,6 +96,12 @@ const AlertIcon = ({ className }: { className?: string }) => (
 );
 const ChevronDown = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
+);
+const ExternalLinkIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+);
+const SparklesIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></svg>
 );
 
 declare var html2pdf: any;
@@ -102,7 +117,7 @@ declare global {
 
 // --- HELPERS ---
 const CustomMarkdown: React.FC<{ content: string; isUser?: boolean }> = ({ content, isUser }) => (
-  <div className={`prose prose-sm max-w-none prose-headings:serif prose-headings:text-slate-900 ${isUser ? 'prose-invert' : 'prose-slate text-slate-800'}`}>
+  <div className={`prose prose-sm max-w-none prose-headings:serif prose-headings:text-slate-900 ${isUser ? 'prose-invert' : 'prose-slate text-slate-800'} prose-a:text-indigo-600 prose-a:font-bold prose-a:no-underline hover:prose-a:underline`}>
     <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]}>
       {content}
     </ReactMarkdown>
@@ -133,7 +148,7 @@ const LoadingSkeleton: React.FC<{ count: number }> = ({ count }) => (
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(true);
   const [history, setHistory] = useState<ComparisonResult[]>(() => {
-    const saved = localStorage.getItem('tradition_explorer_history_v2');
+    const saved = localStorage.getItem('tradition_explorer_history_v4');
     return saved ? JSON.parse(saved) : [];
   });
   const [currentResult, setCurrentResult] = useState<ComparisonResult | null>(null);
@@ -141,6 +156,7 @@ const App: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [question, setQuestion] = useState('');
   const [selectedTraditions, setSelectedTraditions] = useState<Tradition[]>([]);
+  const [selectedModel, setSelectedModel] = useState<ModelOption>('gemini-3-flash-preview');
   const [showHistory, setShowHistory] = useState(false);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
@@ -164,7 +180,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('tradition_explorer_history_v2', JSON.stringify(history));
+    localStorage.setItem('tradition_explorer_history_v4', JSON.stringify(history));
   }, [history]);
 
   useEffect(() => {
@@ -206,77 +222,59 @@ const App: React.FC = () => {
     };
 
     try {
+      const config: any = {
+        systemInstruction: DEFAULT_SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+        tools: [{ googleSearch: {} }]
+      };
+
+      // Apply thinking budget to Pro model for "thoughtful" reasoning
+      if (selectedModel === 'gemini-3-pro-preview') {
+        config.thinkingConfig = { thinkingBudget: 8192 };
+      }
+
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor and absolute lack of repetition between sections.`,
-        config: {
-          systemInstruction: DEFAULT_SYSTEM_PROMPT,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-        },
+        model: selectedModel,
+        contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor, absolute lack of repetition between sections, 8th-grade level summaries, and clickable scholarly URLs.`,
+        config,
       });
+
+      // Extract grounding sources
+      const sources: GroundingSource[] = [];
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (chunks) {
+        chunks.forEach((chunk: any) => {
+          if (chunk.web) {
+            sources.push({ title: chunk.web.title || chunk.web.uri, uri: chunk.web.uri });
+          }
+        });
+      }
 
       const res: ComparisonResult = {
         id: crypto.randomUUID(),
         question,
         selectedTraditions,
         timestamp: Date.now(),
-        modelUsed: 'pro',
+        modelUsed: selectedModel,
         data: JSON.parse(response.text || "{}"),
-        chatHistory: []
+        chatHistory: [],
+        sources: sources.length > 0 ? sources : undefined
       };
       
       setCurrentResult(res);
       setHistory(prev => [res, ...prev]);
     } catch (err: any) {
-      console.warn("Pro model failed, attempting fallback to Flash...", err);
+      console.warn("API call failed:", err);
       
       if (err.message?.includes("Requested entity was not found") || err.message?.includes("API key not valid")) {
         setHasKey(false);
         if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
           await window.aistudio.openSelectKey();
           setHasKey(true);
-          setIsLoading(false);
-          return;
         }
-      }
-
-      try {
-        const fallbackResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor.`,
-          config: {
-            systemInstruction: DEFAULT_SYSTEM_PROMPT,
-            responseMimeType: "application/json",
-            responseSchema: responseSchema,
-          },
-        });
-
-        setFallbackNotice("Switched to Standard Tier analysis due to Pro model unavailability.");
-        
-        const res: ComparisonResult = {
-          id: crypto.randomUUID(),
-          question,
-          selectedTraditions,
-          timestamp: Date.now(),
-          modelUsed: 'flash',
-          data: JSON.parse(fallbackResponse.text || "{}"),
-          chatHistory: []
-        };
-        
-        setCurrentResult(res);
-        setHistory(prev => [res, ...prev]);
-      } catch (fallbackErr: any) {
-        console.error("Analysis Error:", fallbackErr);
-        if (fallbackErr.message?.includes("Requested entity was not found") || fallbackErr.message?.includes("API key not valid")) {
-          setHasKey(false);
-          if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
-            await window.aistudio.openSelectKey();
-            setHasKey(true);
-          }
-        } else {
-          alert(`Scholarship service error: ${fallbackErr.message || 'Unknown error'}. Please verify your network or API key.`);
-        }
+      } else {
+        alert(`Analysis error: ${err.message || 'Unknown error'}. Please verify your network or API key.`);
       }
     } finally {
       setIsLoading(false);
@@ -293,37 +291,22 @@ const App: React.FC = () => {
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Result Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}`;
+    const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Result Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}. Always provide clickable Markdown links to sources.`;
     
-    const tryDialogue = async (model: 'gemini-3-pro-preview' | 'gemini-3-flash-preview') => {
+    try {
       const chat = ai.chats.create({ 
-        model: model, 
-        config: { systemInstruction: context } 
+        model: selectedModel, 
+        config: { systemInstruction: context, tools: [{ googleSearch: {} }] } 
       });
       const response = await chat.sendMessage({ message: input });
-      return response.text;
-    };
-
-    try {
-      const text = await tryDialogue('gemini-3-pro-preview');
-      const modelMsg: ChatMessage = { role: 'model', text: text || "I was unable to formulate a response." };
+      const modelMsg: ChatMessage = { role: 'model', text: response.text || "I was unable to formulate a response." };
       const finalHistory = [...updatedHistory, modelMsg];
       const updatedResult = { ...currentResult, chatHistory: finalHistory };
       setCurrentResult(updatedResult);
       setHistory(history.map(h => h.id === currentResult.id ? updatedResult : h));
     } catch (err: any) {
-      console.warn("Dialogue Pro failed, falling back to Flash...");
-      try {
-        const text = await tryDialogue('gemini-3-flash-preview');
-        const modelMsg: ChatMessage = { role: 'model', text: text || "I was unable to formulate a response." };
-        const finalHistory = [...updatedHistory, modelMsg];
-        const updatedResult = { ...currentResult, chatHistory: finalHistory };
-        setCurrentResult(updatedResult);
-        setHistory(history.map(h => h.id === currentResult.id ? updatedResult : h));
-      } catch (fallbackErr: any) {
-        console.error("Dialogue Error:", fallbackErr);
-        alert("The scholar dialogue is currently unavailable.");
-      }
+      console.error("Dialogue Error:", err);
+      alert("The scholar dialogue is currently unavailable.");
     } finally {
       setIsDialogueLoading(false);
     }
@@ -334,13 +317,16 @@ const App: React.FC = () => {
     setIsExporting(true);
     const element = resultsRef.current;
     const fileName = `Analysis_${currentResult.question.substring(0, 20).replace(/\s/g, '_')}.pdf`;
+    
     const opt = {
-      margin: 0.5,
+      margin: [0.3, 0.3],
       filename: fileName,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-card', '.pdf-header'] }
     };
+
     try {
       if (typeof html2pdf !== 'undefined') {
         await html2pdf().set(opt).from(element).save();
@@ -370,7 +356,7 @@ const App: React.FC = () => {
           </div>
           <h1 className="text-3xl font-black serif mb-4">Initialize Scholarship</h1>
           <p className="text-slate-500 mb-10 leading-relaxed">
-            To access high-tier reasoning models like Gemini 3 Pro, you must link an API key from a paid Google Cloud project. 
+            To access high-tier reasoning models, you must link an API key from a paid Google Cloud project. 
           </p>
           <button 
             onClick={handleSelectKey} 
@@ -378,14 +364,6 @@ const App: React.FC = () => {
           >
             Link API Key
           </button>
-          <a 
-            href="https://ai.google.dev/gemini-api/docs/billing" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="block mt-6 text-xs font-bold text-slate-400 uppercase hover:text-indigo-600 transition-colors"
-          >
-            Billing & Setup Documentation
-          </a>
         </div>
       </div>
     );
@@ -420,14 +398,6 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-8 py-12">
-        {fallbackNotice && (
-          <div className="mb-8 bg-amber-50 border border-amber-200 text-amber-800 px-8 py-4 rounded-2xl flex items-center shadow-sm animate-in fade-in slide-in-from-top-4 duration-500 no-print">
-            <AlertIcon className="mr-3 text-amber-500" />
-            <span className="text-xs font-bold uppercase tracking-wider">{fallbackNotice}</span>
-            <button onClick={() => setFallbackNotice(null)} className="ml-auto text-amber-400 hover:text-amber-600">✕</button>
-          </div>
-        )}
-
         <div className="bg-white rounded-[3rem] shadow-2xl p-14 mb-14 no-print border border-slate-100">
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -482,28 +452,77 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
-          
-          <button 
-            onClick={handleGenerate} 
-            disabled={isLoading || !question || selectedTraditions.length === 0} 
-            className="w-full py-10 bg-indigo-600 text-white font-black uppercase text-base rounded-[2.5rem] shadow-2xl hover:bg-indigo-700 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
-          >
-            {isLoading ? "Consulting the long beards..." : "Generate Analysis"}
-          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+            <div className="space-y-4">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Analysis Depth</label>
+              <div className="relative group">
+                <select 
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
+                  className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all cursor-pointer"
+                >
+                  <option value="gemini-3-flash-preview">Flash (Faster & Balanced)</option>
+                  <option value="gemini-3-pro-preview">Pro (Slower & Thoughtful Reasoning)</option>
+                  <option value="gemini-2.5-flash-lite-latest">Lite (Ultra Fast Efficiency)</option>
+                </select>
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-600 transition-colors">
+                  <ChevronDown />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col justify-end">
+              <button 
+                onClick={handleGenerate} 
+                disabled={isLoading || !question || selectedTraditions.length === 0} 
+                className="w-full py-5 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center space-x-3"
+              >
+                {isLoading ? (
+                   <span className="flex items-center">
+                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                     Consulting the Scholars...
+                   </span>
+                ) : (
+                  <>
+                    <SparklesIcon />
+                    <span>Generate Analysis</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div ref={resultsRef} className="space-y-16">
+        <div ref={resultsRef} className="space-y-16 pdf-container">
           {isLoading && <LoadingSkeleton count={selectedTraditions.length} />}
           
           {currentResult && !isLoading ? (
             <div className="animate-in fade-in slide-in-from-bottom-12 duration-700">
-              <div className="mb-14 border-b-4 border-slate-900 pb-8">
+              <div className="mb-14 border-b-4 border-slate-900 pb-8 pdf-header">
                 <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</div>
-                <h1 className="text-5xl font-black serif mb-4">{currentResult.question}</h1>
+                <h1 className="text-5xl font-black serif mb-4 leading-tight">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} 
-                  {currentResult.modelUsed === 'flash' && ' • Standard Tier'}
+                  Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} • {currentResult.modelUsed.includes('pro') ? 'Deep Tier' : 'Flash Tier'}
                 </p>
+                {currentResult.sources && (
+                  <div className="mt-8 no-print">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Foundational Web Sources</h4>
+                    <div className="flex flex-wrap gap-4">
+                      {currentResult.sources.map((source, sIdx) => (
+                        <a 
+                          key={sIdx} 
+                          href={source.uri} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 bg-slate-100 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-colors border border-transparent hover:border-indigo-100"
+                        >
+                          <span className="text-[10px] font-bold text-slate-700 truncate max-w-[200px]">{source.title}</span>
+                          <ExternalLinkIcon className="text-slate-400" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="fixed bottom-12 right-12 z-[70] no-print">
@@ -517,8 +536,8 @@ const App: React.FC = () => {
               </div>
 
               {(Object.keys(SECTION_LABELS) as SectionKey[]).map((key) => (
-                <div key={key} className="mb-14">
-                  <div className="flex items-center space-x-6 mb-10">
+                <div key={key} className="mb-16 pdf-section-group">
+                  <div className="flex items-center space-x-6 mb-8 pdf-section-title">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">{SECTION_LABELS[key]}</h3>
                     <div className="h-px bg-slate-200 w-full" />
                   </div>
@@ -526,7 +545,7 @@ const App: React.FC = () => {
                     {currentResult.selectedTraditions.map((tradition) => (
                       <div 
                         key={tradition} 
-                        className="flex flex-col p-12 border-2 rounded-[3rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative pdf-card h-full"
+                        className="flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative pdf-card"
                       >
                         <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
@@ -569,7 +588,6 @@ const App: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
                       {new Date(item.timestamp).toLocaleDateString()}
-                      {item.modelUsed === 'flash' && ' (Standard)'}
                     </p>
                     <div className="flex gap-1">
                       {item.selectedTraditions.map(t => <div key={t} className="w-2 h-2 rounded-full bg-slate-200" title={t} />)}
@@ -617,7 +635,6 @@ const App: React.FC = () => {
                 <textarea 
                   rows={2} 
                   className="flex-grow p-8 text-base border-2 border-slate-100 rounded-[2rem] outline-none focus:border-indigo-500 transition-all resize-none shadow-inner bg-white text-slate-900" 
-                  style={{ backgroundColor: 'white', color: '#0f172a' }}
                   placeholder="Inquire further..." 
                   value={dialogueInput} 
                   onChange={(e) => setDialogueInput(e.target.value)} 

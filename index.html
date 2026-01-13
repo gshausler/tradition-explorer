@@ -27,22 +27,48 @@
         /* PDF and Print Styles */
         @media print {
             .no-print { display: none !important; }
-            .pdf-show { display: block !important; }
             body, #root { background: white !important; color: black !important; margin: 0; padding: 0; }
-            .pdf-card { break-inside: avoid; margin-bottom: 2rem; border: 1px solid #e2e8f0 !important; padding: 2rem !important; }
+            
+            .pdf-container { width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            
+            /* Prevent breaking within the header */
+            .pdf-header { break-inside: avoid; border-bottom: 2px solid #000 !important; padding-bottom: 2rem !important; margin-bottom: 3rem !important; }
+            
+            /* Prevent breaking within section groups if they are reasonably small */
+            .pdf-section-group { break-inside: auto; margin-bottom: 2rem !important; }
+            
+            /* Prevent breaking section title from its content */
+            .pdf-section-title { break-after: avoid !important; margin-bottom: 1rem !important; }
+            
+            /* CRITICAL: Prevent breaking mid-card */
+            .pdf-card { 
+                break-inside: avoid !important; 
+                page-break-inside: avoid !important;
+                border: 1px solid #e2e8f0 !important; 
+                margin-bottom: 1.5rem !important;
+                padding: 1.5rem !important;
+                border-radius: 1rem !important;
+                box-shadow: none !important;
+            }
         }
         
-        .pdf-show { display: none; }
-
         /* Custom Prose Adjustments */
-        .prose h3 { font-family: 'Playfair Display', serif; font-weight: 900; margin-top: 2rem; }
-        .prose a { color: var(--brand-indigo); text-decoration: underline; font-weight: 700; }
+        .prose h3 { font-family: 'Playfair Display', serif; font-weight: 900; margin-top: 1.5rem; }
+        .prose a { color: var(--brand-indigo); text-decoration: underline; font-weight: 700; transition: opacity 0.2s; }
+        .prose a:hover { opacity: 0.7; }
         
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Animation Helpers */
+        .animate-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
     <script type="importmap">
     {
