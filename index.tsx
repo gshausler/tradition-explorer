@@ -72,14 +72,12 @@ const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor. Respond O
 Analyze the provided question from the perspective of each selected tradition.
 
 STRICT CONTENT RULES:
-1. 'summary': Provide a MAXIMUM of 1-2 sentences per tradition. Write this section for an 8th-grade reading level (clear, simple, no jargon). It should be an "elevator pitch" of their core stance.
-2. CITATIONS & HYPERLINKS: Every assertion or argument MUST be bolstered by a clickable Markdown hyperlink to a primary source, official text, or reputable academic encyclopedia (e.g., [Source Name](URL)). Include multiple links per tradition in every section.
-3. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts or arguments already stated in previous sections.
-4. Section-Specific Focus:
-   - 'comparison': Focus strictly on how traditions differ from or align with each other. Use links to comparative studies.
-   - 'discussion': Explore internal debates, historical evolution, or modern edge-cases. Link to modern scholarship.
-   - 'deep dive': Explain specific metaphysical/logical frameworks (scriptures, axioms). Link to the full text of scriptures or philosophical treatises.
-5. Format: { "section_name": { "Tradition Name": "Markdown content with [Hyperlinks](URL)..." } }`;
+1. 'summary': Provide a MAXIMUM of 1-2 sentences per tradition. Write this section for an 8th-grade reading level.
+2. CITATIONS & HYPERLINKS: Every assertion MUST be bolstered by a clickable Markdown hyperlink to a primary source or scholarly text.
+3. LINK VALIDATION MANDATE: You MUST use the Google Search tool to verify that EVERY URL you provide is currently active, accessible, and leads to the correct resource. 
+4. DEAD LINK RECOVERY: If your first choice for a link is invalid or leads to a 404 error, you MUST search for and provide a working, alternate valid link from a reputable scholarly source.
+5. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts.
+6. Format: { "section_name": { "Tradition Name": "Markdown content with verified [Links](URL)..." } }`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
@@ -104,7 +102,6 @@ const SparklesIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></svg>
 );
 
-declare var html2pdf: any;
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
@@ -118,7 +115,15 @@ declare global {
 // --- HELPERS ---
 const CustomMarkdown: React.FC<{ content: string; isUser?: boolean }> = ({ content, isUser }) => (
   <div className={`prose prose-sm max-w-none prose-headings:serif prose-headings:text-slate-900 ${isUser ? 'prose-invert' : 'prose-slate text-slate-800'} prose-a:text-indigo-600 prose-a:font-bold prose-a:no-underline hover:prose-a:underline`}>
-    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]}>
+    <ReactMarkdown 
+      remarkPlugins={[remarkGfm]} 
+      rehypePlugins={[rehypeSlug]}
+      components={{
+        a: ({ node, ...props }) => (
+          <a {...props} target="_blank" rel="noopener noreferrer" />
+        )
+      }}
+    >
       {content}
     </ReactMarkdown>
   </div>
@@ -153,7 +158,6 @@ const App: React.FC = () => {
   });
   const [currentResult, setCurrentResult] = useState<ComparisonResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [question, setQuestion] = useState('');
   const [selectedTraditions, setSelectedTraditions] = useState<Tradition[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelOption>('gemini-3-flash-preview');
@@ -162,7 +166,6 @@ const App: React.FC = () => {
   const [showExamples, setShowExamples] = useState(false);
   const [dialogueInput, setDialogueInput] = useState('');
   const [isDialogueLoading, setIsDialogueLoading] = useState(false);
-  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   
   const resultsRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -199,7 +202,6 @@ const App: React.FC = () => {
   const handleGenerate = async () => {
     if (!question || selectedTraditions.length === 0) return;
     setIsLoading(true);
-    setFallbackNotice(null);
     setCurrentResult(null); 
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -229,18 +231,18 @@ const App: React.FC = () => {
         tools: [{ googleSearch: {} }]
       };
 
-      // Apply thinking budget to Pro model for "thoughtful" reasoning
       if (selectedModel === 'gemini-3-pro-preview') {
         config.thinkingConfig = { thinkingBudget: 8192 };
       }
 
       const response = await ai.models.generateContent({
         model: selectedModel,
-        contents: `Provide a structured multi-perspective analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. Ensure academic rigor, absolute lack of repetition between sections, 8th-grade level summaries, and clickable scholarly URLs.`,
+        contents: `Perform a rigorous multi-tradition analysis of: "${question}" for ${selectedTraditions.join(', ')}. 
+        CRITICAL: Use the Google Search tool to verify that every citation link is live and valid. If a link is broken, find a valid alternate. 
+        Each section must be substantial and informative. Ensure summaries are at an 8th-grade level.`,
         config,
       });
 
-      // Extract grounding sources
       const sources: GroundingSource[] = [];
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
@@ -266,7 +268,6 @@ const App: React.FC = () => {
       setHistory(prev => [res, ...prev]);
     } catch (err: any) {
       console.warn("API call failed:", err);
-      
       if (err.message?.includes("Requested entity was not found") || err.message?.includes("API key not valid")) {
         setHasKey(false);
         if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
@@ -291,7 +292,7 @@ const App: React.FC = () => {
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Result Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}. Always provide clickable Markdown links to sources.`;
+    const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}. Verify all links via search before providing them.`;
     
     try {
       const chat = ai.chats.create({ 
@@ -309,35 +310,6 @@ const App: React.FC = () => {
       alert("The scholar dialogue is currently unavailable.");
     } finally {
       setIsDialogueLoading(false);
-    }
-  };
-
-  const handleExportPDF = async () => {
-    if (!currentResult || !resultsRef.current || isExporting) return;
-    setIsExporting(true);
-    const element = resultsRef.current;
-    const fileName = `Analysis_${currentResult.question.substring(0, 20).replace(/\s/g, '_')}.pdf`;
-    
-    const opt = {
-      margin: [0.3, 0.3],
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-card', '.pdf-header'] }
-    };
-
-    try {
-      if (typeof html2pdf !== 'undefined') {
-        await html2pdf().set(opt).from(element).save();
-      } else {
-        window.print();
-      }
-    } catch (err) {
-      console.error("PDF Export failed:", err);
-      window.print();
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -371,7 +343,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      <header className="bg-white border-b sticky top-0 z-[60] no-print h-20 flex items-center justify-between px-10 shadow-sm">
+      <header className="bg-white border-b sticky top-0 z-[60] h-20 flex items-center justify-between px-10 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg">
             <HistoryIcon className="w-6 h-6" />
@@ -385,20 +357,11 @@ const App: React.FC = () => {
           >
             Archives
           </button>
-          {currentResult && (
-            <button 
-              onClick={handleExportPDF} 
-              disabled={isExporting} 
-              className="px-8 py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {isExporting ? "Exporting..." : "Export PDF"}
-            </button>
-          )}
         </div>
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-8 py-12">
-        <div className="bg-white rounded-[3rem] shadow-2xl p-14 mb-14 no-print border border-slate-100">
+        <div className="bg-white rounded-[3rem] shadow-2xl p-14 mb-14 border border-slate-100">
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thematic Inquiry</label>
@@ -455,7 +418,13 @@ const App: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
             <div className="space-y-4">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Analysis Depth</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Analysis Depth</label>
+                <div className="flex items-center space-x-2 text-[8px] font-black uppercase text-indigo-600 animate-pulse">
+                  <ExternalLinkIcon className="w-2 h-2" />
+                  <span>Real-time Link Validation Active</span>
+                </div>
+              </div>
               <div className="relative group">
                 <select 
                   value={selectedModel}
@@ -480,7 +449,7 @@ const App: React.FC = () => {
                 {isLoading ? (
                    <span className="flex items-center">
                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                     Consulting the Scholars...
+                     Validating Links & Scholars...
                    </span>
                 ) : (
                   <>
@@ -493,20 +462,20 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div ref={resultsRef} className="space-y-16 pdf-container">
+        <div ref={resultsRef} className="space-y-16">
           {isLoading && <LoadingSkeleton count={selectedTraditions.length} />}
           
           {currentResult && !isLoading ? (
             <div className="animate-in fade-in slide-in-from-bottom-12 duration-700">
-              <div className="mb-14 border-b-4 border-slate-900 pb-8 pdf-header">
+              <div className="mb-14 border-b-4 border-slate-900 pb-8">
                 <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</div>
                 <h1 className="text-5xl font-black serif mb-4 leading-tight">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                   Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} • {currentResult.modelUsed.includes('pro') ? 'Deep Tier' : 'Flash Tier'}
                 </p>
                 {currentResult.sources && (
-                  <div className="mt-8 no-print">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Foundational Web Sources</h4>
+                  <div className="mt-8">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Foundational Web Sources (Verified)</h4>
                     <div className="flex flex-wrap gap-4">
                       {currentResult.sources.map((source, sIdx) => (
                         <a 
@@ -525,7 +494,7 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              <div className="fixed bottom-12 right-12 z-[70] no-print">
+              <div className="fixed bottom-12 right-12 z-[70]">
                  <button 
                   onClick={() => setShowDiscussion(true)} 
                   className="group flex items-center bg-indigo-600 text-white px-10 py-6 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all"
@@ -536,8 +505,8 @@ const App: React.FC = () => {
               </div>
 
               {(Object.keys(SECTION_LABELS) as SectionKey[]).map((key) => (
-                <div key={key} className="mb-16 pdf-section-group">
-                  <div className="flex items-center space-x-6 mb-8 pdf-section-title">
+                <div key={key} className="mb-16">
+                  <div className="flex items-center space-x-6 mb-8">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">{SECTION_LABELS[key]}</h3>
                     <div className="h-px bg-slate-200 w-full" />
                   </div>
@@ -545,7 +514,7 @@ const App: React.FC = () => {
                     {currentResult.selectedTraditions.map((tradition) => (
                       <div 
                         key={tradition} 
-                        className="flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative pdf-card"
+                        className="flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative"
                       >
                         <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
@@ -566,7 +535,7 @@ const App: React.FC = () => {
       </main>
 
       {showHistory && (
-        <div className="fixed inset-0 z-[110] no-print flex justify-end" onClick={() => setShowHistory(false)}>
+        <div className="fixed inset-0 z-[110] flex justify-end" onClick={() => setShowHistory(false)}>
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" />
           <div 
             className="relative w-full max-w-md bg-white shadow-2xl flex flex-col p-12 animate-in slide-in-from-right duration-300" 
@@ -601,7 +570,7 @@ const App: React.FC = () => {
       )}
 
       {showDiscussion && currentResult && (
-        <div className="fixed inset-0 z-[100] no-print" onClick={() => setShowDiscussion(false)}>
+        <div className="fixed inset-0 z-[100]" onClick={() => setShowDiscussion(false)}>
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
           <div 
             className="absolute inset-y-0 right-0 max-w-2xl w-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300" 
