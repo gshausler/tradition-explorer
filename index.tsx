@@ -10,7 +10,7 @@ type Tradition =
   | 'Fundamentalist Christianity' | 'Judaism' | 'Stoicism' | 'Mainstream Christianity'
   | 'Catholicism' | 'Islam' | 'Humanism' | 'Buddhism' | 'Taoism' | 'Hinduism';
 
-type SectionKey = 'summary' | 'comparison' | 'discussion' | 'deep dive' | 'quotes and references' | 'conclusion';
+type SectionKey = 'summary' | 'comparison' | 'discussion' | 'deep dive' | 'conclusion' | 'quotes and references';
 
 type ModelOption = 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-flash-lite-latest';
 
@@ -23,11 +23,6 @@ interface ChatMessage {
   text: string;
 }
 
-interface GroundingSource {
-  title: string;
-  uri: string;
-}
-
 interface ComparisonResult {
   id: string;
   question: string;
@@ -38,7 +33,6 @@ interface ComparisonResult {
     [key in SectionKey]: TraditionContent;
   };
   chatHistory?: ChatMessage[];
-  sources?: GroundingSource[];
 }
 
 const TRADITIONS: Tradition[] = [
@@ -69,19 +63,17 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor and ethics researcher. Respond ONLY in valid JSON.
-Your goal is to provide deep, accurate, and multi-perspective analysis.
 
 STRICT TONE & READING LEVEL RULES:
-1. 'summary' (Concise Stance): MUST be written at an 8th-grade reading level. Use simple vocabulary and short, declarative sentences. Avoid jargon.
-2. ALL OTHER SECTIONS: MUST be written at a College Graduate / Academic Researcher level. Use sophisticated vocabulary, nuanced dialectics, and technical terminology.
+1. 'summary' (Concise Stance): MUST be written at an 8th-grade reading level. Use simple vocabulary and short sentences. No jargon.
+2. ALL OTHER SECTIONS: MUST be written at a College Graduate / Academic Researcher level. Use sophisticated vocabulary and technical terminology.
 
 STRICT CITATION & LINK RULES:
-1. NO LINKS IN CONTENT: DO NOT place any Markdown links, URLs, or bracketed citations in the 'summary', 'comparison', 'discussion', 'deep dive', or 'conclusion' sections. Refer to sources by title/author only (e.g., "The Meditations of Marcus Aurelius").
-2. CENTRALIZED BIBLIOGRAPHY: All verified URLs, deep-links, and citations MUST be exclusively placed in the 'quotes and references' (Glossary & Resources) section.
-3. LINK ACCURACY: Use Google Search to verify that every URL in the 'quotes and references' section is active and leads directly to the specific primary source (e.g., a specific Bible verse or Catechism paragraph). Avoid homepages or general landing pages.
-4. CONTENT OF GLOSSARY: For each tradition, provide a bulleted list of the verified URLs and a "Key Terms" definition list for technical jargon used in the analysis.
+1. NO LINKS IN CONTENT SECTIONS: DO NOT place any Markdown links, URLs, or bracketed citations in 'summary', 'comparison', 'discussion', 'deep dive', or 'conclusion'. Refer to sources by title only.
+2. CENTRALIZED GLOSSARY: Every single link, URL, and citation MUST be moved to the 'quotes and references' section. 
+3. LINK QUALITY: Use Google Search to find deep-links to specific chapters/verses/articles. No general homepages.
 
-Format: { "section_name": { "Tradition Name": "Markdown content..." } }`;
+JSON Structure must strictly follow the provided responseSchema. Each section must contain an entry for every tradition requested.`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
@@ -95,9 +87,6 @@ const KeyIcon = ({ className }: { className?: string }) => (
 );
 const ChevronDown = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
-);
-const SparklesIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></svg>
 );
 
 declare global {
@@ -151,7 +140,7 @@ const LoadingSkeleton: React.FC<{ count: number }> = ({ count }) => (
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(true);
   const [history, setHistory] = useState<ComparisonResult[]>(() => {
-    const saved = localStorage.getItem('tradition_explorer_history_v6');
+    const saved = localStorage.getItem('tradition_explorer_history_v8');
     return saved ? JSON.parse(saved) : [];
   });
   const [currentResult, setCurrentResult] = useState<ComparisonResult | null>(null);
@@ -181,7 +170,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('tradition_explorer_history_v6', JSON.stringify(history));
+    localStorage.setItem('tradition_explorer_history_v8', JSON.stringify(history));
   }, [history]);
 
   useEffect(() => {
@@ -203,63 +192,58 @@ const App: React.FC = () => {
     setCurrentResult(null); 
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const traditionSchemaProperties = selectedTraditions.reduce((acc, trad) => {
-      acc[trad] = { type: Type.STRING };
-      return acc;
-    }, {} as any);
-    const sectionSchema = { type: Type.OBJECT, properties: traditionSchemaProperties, required: selectedTraditions };
+    
+    // Dynamic but simple schema
+    const traditionProps = selectedTraditions.reduce((a, t) => ({...a, [t]: {type: Type.STRING}}), {});
+    const traditionSchema = { type: Type.OBJECT, properties: traditionProps, required: selectedTraditions };
     const responseSchema = {
       type: Type.OBJECT,
       properties: {
-        summary: sectionSchema,
-        comparison: sectionSchema,
-        discussion: sectionSchema,
-        "deep dive": sectionSchema,
-        conclusion: sectionSchema,
-        "quotes and references": sectionSchema,
+        summary: traditionSchema,
+        comparison: traditionSchema,
+        discussion: traditionSchema,
+        "deep dive": traditionSchema,
+        conclusion: traditionSchema,
+        "quotes and references": traditionSchema,
       },
       required: ["summary", "comparison", "discussion", "deep dive", "conclusion", "quotes and references"],
     };
 
     try {
-      const config: any = {
-        systemInstruction: DEFAULT_SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-        tools: [{ googleSearch: {} }]
-      };
-
-      if (selectedModel === 'gemini-3-pro-preview') {
-        config.thinkingConfig = { thinkingBudget: 24000 };
-      }
-
       const response = await ai.models.generateContent({
         model: selectedModel,
-        contents: `Topic: "${question}". Perspectives: ${selectedTraditions.join(', ')}.
+        contents: `Topic: "${question}". Perspectives: ${selectedTraditions.join(', ')}. 
         
-        CRITICAL FORMATTING INSTRUCTIONS:
-        1. CONCISE STANCE: Written at an 8th-grade level. No complex words.
-        2. ALL OTHERS: Advanced graduate academic level.
-        3. CENTRALIZATION: Zero links or URLs in the summary, comparison, discussion, deep dive, or conclusion.
-        4. ALL verified URLs and citations must appear ONLY in the 'Glossary & Resources' section.`,
-        config,
+        Mandatory:
+        - Summary: 8th grade.
+        - Others: Academic graduate level.
+        - NO links in analysis.
+        - ALL verified links in 'quotes and references'.`,
+        config: {
+          systemInstruction: DEFAULT_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          responseSchema: responseSchema,
+          tools: [{ googleSearch: {} }],
+          // Removing thinking budget entirely to prevent proxy deadline errors (500)
+        },
       });
 
+      const data = JSON.parse(response.text || "{}");
       const res: ComparisonResult = {
         id: crypto.randomUUID(),
         question,
         selectedTraditions,
         timestamp: Date.now(),
         modelUsed: selectedModel,
-        data: JSON.parse(response.text || "{}"),
+        data,
         chatHistory: []
       };
       
       setCurrentResult(res);
       setHistory(prev => [res, ...prev]);
     } catch (err: any) {
-      console.error("API call failed:", err);
-      alert(`Scholarly audit failed: ${err.message || 'Verification error'}.`);
+      console.error("RPC/Analysis error:", err);
+      alert(`Scholarly analysis failed. This is often due to API timeouts. Please try again with fewer traditions or a shorter prompt. (Error: ${err.message})`);
     } finally {
       setIsLoading(false);
     }
@@ -275,7 +259,7 @@ const App: React.FC = () => {
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const context = `World-class scholar. Question: "${currentResult.question}". Tone: College Graduate level. Ensure all references are strictly verified via Google Search.`;
+    const context = `Scholar dialogue. Topic: "${currentResult.question}". Academic tone.`;
     
     try {
       const chat = ai.chats.create({ 
@@ -283,7 +267,7 @@ const App: React.FC = () => {
         config: { systemInstruction: context, tools: [{ googleSearch: {} }] } 
       });
       const response = await chat.sendMessage({ message: input });
-      const modelMsg: ChatMessage = { role: 'model', text: response.text || "I was unable to consult the archives." };
+      const modelMsg: ChatMessage = { role: 'model', text: response.text || "Connection lost." };
       const finalHistory = [...updatedHistory, modelMsg];
       const updatedResult = { ...currentResult, chatHistory: finalHistory };
       setCurrentResult(updatedResult);
@@ -332,15 +316,23 @@ const App: React.FC = () => {
       <main className="flex-grow max-w-6xl mx-auto w-full px-8 py-12">
         <div className="bg-white rounded-[3rem] shadow-2xl p-14 mb-14 border border-slate-100">
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thematic Inquiry</label>
-              <button onClick={() => setShowExamples(!showExamples)} className="flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</label>
+            <div className="flex flex-col space-y-4">
+              <input 
+                type="text" 
+                className="w-full px-10 py-8 rounded-[2rem] border-2 border-slate-50 bg-slate-50 text-slate-900 font-bold text-xl outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                placeholder='e.g. The source of objective morality...' 
+                value={question} 
+                onChange={(e) => setQuestion(e.target.value)} 
+                onKeyDown={(e) => { if (e.key === 'Enter') handleGenerate(); }}
+              />
+              <button onClick={() => setShowExamples(!showExamples)} className="self-start px-4 text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center">
                 Inspiration <ChevronDown className={`ml-2 transition-transform duration-300 ${showExamples ? 'rotate-180' : ''}`} />
               </button>
             </div>
             
             {showExamples && (
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-6 bg-slate-50 rounded-3xl border border-slate-100">
                 {EXAMPLE_QUERIES.map((ex, i) => (
                   <button key={i} onClick={() => { setQuestion(ex); setShowExamples(false); }} className="text-left px-5 py-4 text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-white rounded-xl transition-all">
                     {ex}
@@ -348,14 +340,6 @@ const App: React.FC = () => {
                 ))}
               </div>
             )}
-
-            <input 
-              type="text" 
-              className="w-full px-10 py-8 rounded-[2rem] border-2 border-slate-50 bg-slate-50 text-slate-900 font-bold text-xl outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
-              placeholder='e.g. The morality of genetic engineering...' 
-              value={question} 
-              onChange={(e) => setQuestion(e.target.value)} 
-            />
           </div>
           
           <div className="mb-14">
@@ -379,20 +363,20 @@ const App: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Scholarly Precision</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Research Precision</label>
               <select 
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
-                className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all"
+                className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all cursor-pointer"
               >
-                <option value="gemini-3-pro-preview">Pro (Deep Grounding & Verified Research)</option>
-                <option value="gemini-3-flash-preview">Flash (Balanced Context)</option>
+                <option value="gemini-3-flash-preview">Flash (High Velocity - Recommended)</option>
+                <option value="gemini-3-pro-preview">Pro (Maximum Insight)</option>
                 <option value="gemini-2.5-flash-lite-latest">Lite (Fast Overview)</option>
               </select>
             </div>
             <div className="flex flex-col justify-end">
               <button onClick={handleGenerate} disabled={isLoading || !question || selectedTraditions.length === 0} className="w-full py-5 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50">
-                {isLoading ? "Consulting Primary Sources..." : "Execute Comparative Analysis"}
+                {isLoading ? "Consulting Traditions..." : "Execute Comparative Analysis"}
               </button>
             </div>
           </div>
@@ -406,7 +390,7 @@ const App: React.FC = () => {
               <div className="mb-14 border-b-4 border-slate-900 pb-8">
                 <h1 className="text-5xl font-black serif mb-4 leading-tight">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Research Report • Verified by {currentResult.modelUsed.includes('pro') ? 'Deep Audit' : 'Standard Baseline'}
+                  Report generated via {currentResult.modelUsed.replace('-preview', '')}
                 </p>
               </div>
 
@@ -424,7 +408,7 @@ const App: React.FC = () => {
                         <div className="absolute top-0 right-10 -translate-y-1/2 bg-slate-900 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
                         </div>
-                        <CustomMarkdown content={currentResult.data[key][tradition] || "Reference pending verification."} />
+                        <CustomMarkdown content={currentResult.data[key]?.[tradition] || "Analysis pending archival verification."} />
                       </div>
                     ))}
                   </div>
@@ -433,7 +417,7 @@ const App: React.FC = () => {
             </div>
           ) : !isLoading && (
             <div className="text-center py-56 border-4 border-dashed border-slate-200 rounded-[4rem] opacity-30">
-              <p className="text-sm font-black uppercase tracking-[0.5em] text-slate-300">Archive Standby</p>
+              <p className="text-sm font-black uppercase tracking-[0.5em] text-slate-300">Scholar Standby</p>
             </div>
           )}
         </div>
@@ -452,11 +436,14 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[110] flex justify-end" onClick={() => setShowHistory(false)}>
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
           <div className="relative w-full max-w-md bg-white p-12 overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h2 className="text-4xl font-black serif mb-10">Archives</h2>
+            <div className="flex justify-between items-center mb-10">
+              <h2 className="text-4xl font-black serif">Archives</h2>
+              <button onClick={() => setShowHistory(false)} className="text-2xl">✕</button>
+            </div>
             <div className="space-y-6">
-              {history.map(item => (
-                <button key={item.id} onClick={() => { setCurrentResult(item); setShowHistory(false); }} className="w-full text-left p-8 border-2 border-slate-50 rounded-[2rem] hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
-                  <p className="font-bold text-slate-900 mb-2">{item.question}</p>
+              {history.length === 0 ? <p className="text-slate-400 italic">No past analyses found.</p> : history.map(item => (
+                <button key={item.id} onClick={() => { setCurrentResult(item); setShowHistory(false); setQuestion(item.question); setSelectedTraditions(item.selectedTraditions); }} className="w-full text-left p-8 border-2 border-slate-50 rounded-[2rem] hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
+                  <p className="font-bold text-slate-900 mb-2 line-clamp-2">{item.question}</p>
                   <p className="text-[10px] text-slate-400 font-black uppercase">{new Date(item.timestamp).toLocaleDateString()}</p>
                 </button>
               ))}
