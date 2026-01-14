@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -65,27 +64,24 @@ const SECTION_LABELS: Record<string, string> = {
   'comparison': 'Thematic Comparison',
   'discussion': 'Nuanced Discussion',
   'deep dive': 'Foundational Logic',
-  'quotes and references': 'Glossary & Resources',
-  'conclusion': 'Final Synthesis'
+  'conclusion': 'Final Synthesis',
+  'quotes and references': 'Glossary & Resources'
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor and ethics researcher. Respond ONLY in valid JSON.
-Your goal is to provide deep, accurate, and multi-perspective analysis grounded in high-quality evidence.
+Your goal is to provide deep, accurate, and multi-perspective analysis.
 
-CRITICAL CITATION GUIDELINES:
-1. RELEVANCE: Links must lead directly to the specific text, scripture, article, or encyclopedia entry that supports your claim. DO NOT link to general homepages (e.g., avoid vatican.va, instead link to the specific Paragraph in the Catechism).
-2. VALIDITY: Use the Google Search tool to verify that every URL is active and correctly points to the cited content. If a link returns a 404 or is irrelevant, you MUST find an alternate scholarly source.
-3. SOURCE TYPES: Prioritize primary scriptures (Sefaria, BibleGateway, Quran.com), academic encyclopedias (Stanford Encyclopedia of Philosophy, Britannica), and peer-reviewed articles.
-4. FORMATTING: Use Markdown: [Specific Article Title or Scripture Verse](URL).
-5. NO HALLUCINATIONS: Do not guess URLs. If you cannot find a direct link for a specific claim using search, find a broader but verified scholarly overview that mentions the claim.
+STRICT TONE & READING LEVEL RULES:
+1. 'summary' (Concise Stance): MUST be written at an 8th-grade reading level. Use simple vocabulary and short, declarative sentences. Avoid jargon.
+2. ALL OTHER SECTIONS: MUST be written at a College Graduate / Academic Researcher level. Use sophisticated vocabulary, nuanced dialectics, and technical terminology.
 
-CONTENT RULES:
-- 'summary': 1-2 sentences for an 8th-grade level.
-- 'deep dive': Focus on metaphysical foundations and logic.
-- 'quotes and references': Provide direct excerpts with verified links.
-- NO REPETITION: Each section must offer fresh insights.
+STRICT CITATION & LINK RULES:
+1. NO LINKS IN CONTENT: DO NOT place any Markdown links, URLs, or bracketed citations in the 'summary', 'comparison', 'discussion', 'deep dive', or 'conclusion' sections. Refer to sources by title/author only (e.g., "The Meditations of Marcus Aurelius").
+2. CENTRALIZED BIBLIOGRAPHY: All verified URLs, deep-links, and citations MUST be exclusively placed in the 'quotes and references' (Glossary & Resources) section.
+3. LINK ACCURACY: Use Google Search to verify that every URL in the 'quotes and references' section is active and leads directly to the specific primary source (e.g., a specific Bible verse or Catechism paragraph). Avoid homepages or general landing pages.
+4. CONTENT OF GLOSSARY: For each tradition, provide a bulleted list of the verified URLs and a "Key Terms" definition list for technical jargon used in the analysis.
 
-Format: { "section_name": { "Tradition Name": "Markdown content with deep-linked [Verified Evidence](URL)..." } }`;
+Format: { "section_name": { "Tradition Name": "Markdown content..." } }`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
@@ -97,14 +93,8 @@ const MessageIcon = ({ className }: { className?: string }) => (
 const KeyIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3L15.5 7.5z"/></svg>
 );
-const AlertIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-);
 const ChevronDown = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
-);
-const ExternalLinkIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
 );
 const SparklesIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></svg>
@@ -161,7 +151,7 @@ const LoadingSkeleton: React.FC<{ count: number }> = ({ count }) => (
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(true);
   const [history, setHistory] = useState<ComparisonResult[]>(() => {
-    const saved = localStorage.getItem('tradition_explorer_history_v4');
+    const saved = localStorage.getItem('tradition_explorer_history_v6');
     return saved ? JSON.parse(saved) : [];
   });
   const [currentResult, setCurrentResult] = useState<ComparisonResult | null>(null);
@@ -191,7 +181,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('tradition_explorer_history_v4', JSON.stringify(history));
+    localStorage.setItem('tradition_explorer_history_v6', JSON.stringify(history));
   }, [history]);
 
   useEffect(() => {
@@ -225,10 +215,10 @@ const App: React.FC = () => {
         comparison: sectionSchema,
         discussion: sectionSchema,
         "deep dive": sectionSchema,
-        "quotes and references": sectionSchema,
         conclusion: sectionSchema,
+        "quotes and references": sectionSchema,
       },
-      required: ["summary", "comparison", "discussion", "deep dive", "quotes and references", "conclusion"],
+      required: ["summary", "comparison", "discussion", "deep dive", "conclusion", "quotes and references"],
     };
 
     try {
@@ -240,30 +230,20 @@ const App: React.FC = () => {
       };
 
       if (selectedModel === 'gemini-3-pro-preview') {
-        config.thinkingConfig = { thinkingBudget: 16000 };
+        config.thinkingConfig = { thinkingBudget: 24000 };
       }
 
       const response = await ai.models.generateContent({
         model: selectedModel,
-        contents: `Perform a deep scholarly analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. 
+        contents: `Topic: "${question}". Perspectives: ${selectedTraditions.join(', ')}.
         
-        INSTRUCTIONS FOR ACCURACY:
-        1. For every argument, perform a specific Google Search to find a primary source link (scripture, official document, or peer-reviewed article).
-        2. VERIFY the link is specific. For Catholicism, link to the Catechism paragraph. For Stoicism, link to the specific Meditations or Enchiridion chapter.
-        3. AVOID broken or general homepages. If a direct link isn't available, cite a verified academic overview page that explicitly confirms your statement.
-        4. Summaries must remain accessible (8th-grade level), but citations must be expert-tier.`,
+        CRITICAL FORMATTING INSTRUCTIONS:
+        1. CONCISE STANCE: Written at an 8th-grade level. No complex words.
+        2. ALL OTHERS: Advanced graduate academic level.
+        3. CENTRALIZATION: Zero links or URLs in the summary, comparison, discussion, deep dive, or conclusion.
+        4. ALL verified URLs and citations must appear ONLY in the 'Glossary & Resources' section.`,
         config,
       });
-
-      const sources: GroundingSource[] = [];
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
-        chunks.forEach((chunk: any) => {
-          if (chunk.web) {
-            sources.push({ title: chunk.web.title || chunk.web.uri, uri: chunk.web.uri });
-          }
-        });
-      }
 
       const res: ComparisonResult = {
         id: crypto.randomUUID(),
@@ -272,23 +252,14 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         modelUsed: selectedModel,
         data: JSON.parse(response.text || "{}"),
-        chatHistory: [],
-        sources: sources.length > 0 ? sources : undefined
+        chatHistory: []
       };
       
       setCurrentResult(res);
       setHistory(prev => [res, ...prev]);
     } catch (err: any) {
-      console.warn("API call failed:", err);
-      if (err.message?.includes("Requested entity was not found") || err.message?.includes("API key not valid")) {
-        setHasKey(false);
-        if (typeof window.aistudio !== 'undefined' && window.aistudio.openSelectKey) {
-          await window.aistudio.openSelectKey();
-          setHasKey(true);
-        }
-      } else {
-        alert(`Analysis error: ${err.message || 'Unknown error'}. Please verify your network or API key.`);
-      }
+      console.error("API call failed:", err);
+      alert(`Scholarly audit failed: ${err.message || 'Verification error'}.`);
     } finally {
       setIsLoading(false);
     }
@@ -304,8 +275,7 @@ const App: React.FC = () => {
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const context = `You are a scholarly mentor. User is asking about: "${currentResult.question}". traditions: ${currentResult.selectedTraditions.join(', ')}. 
-    Ground your answers in primary sources. Verify every link you provide using Google Search before sending.`;
+    const context = `World-class scholar. Question: "${currentResult.question}". Tone: College Graduate level. Ensure all references are strictly verified via Google Search.`;
     
     try {
       const chat = ai.chats.create({ 
@@ -313,14 +283,13 @@ const App: React.FC = () => {
         config: { systemInstruction: context, tools: [{ googleSearch: {} }] } 
       });
       const response = await chat.sendMessage({ message: input });
-      const modelMsg: ChatMessage = { role: 'model', text: response.text || "I was unable to formulate a response." };
+      const modelMsg: ChatMessage = { role: 'model', text: response.text || "I was unable to consult the archives." };
       const finalHistory = [...updatedHistory, modelMsg];
       const updatedResult = { ...currentResult, chatHistory: finalHistory };
       setCurrentResult(updatedResult);
       setHistory(history.map(h => h.id === currentResult.id ? updatedResult : h));
     } catch (err: any) {
       console.error("Dialogue Error:", err);
-      alert("The scholar dialogue is currently unavailable.");
     } finally {
       setIsDialogueLoading(false);
     }
@@ -334,21 +303,13 @@ const App: React.FC = () => {
 
   if (!hasKey) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-[3rem] shadow-2xl p-16 max-w-xl w-full text-center border border-slate-100">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
+        <div className="bg-white rounded-[3rem] shadow-2xl p-16 max-w-xl w-full border border-slate-100">
           <div className="bg-indigo-600 w-20 h-20 rounded-3xl flex items-center justify-center text-white mx-auto mb-8 shadow-xl">
             <KeyIcon className="w-10 h-10" />
           </div>
           <h1 className="text-3xl font-black serif mb-4">Initialize Scholarship</h1>
-          <p className="text-slate-500 mb-10 leading-relaxed">
-            To access high-tier reasoning models, you must link an API key from a paid Google Cloud project. 
-          </p>
-          <button 
-            onClick={handleSelectKey} 
-            className="w-full py-6 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95"
-          >
-            Link API Key
-          </button>
+          <button onClick={handleSelectKey} className="w-full py-6 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95">Link API Key</button>
         </div>
       </div>
     );
@@ -363,14 +324,9 @@ const App: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black serif tracking-tight">Ethics and Traditions explorer</h1>
         </div>
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => setShowHistory(true)} 
-            className="px-6 py-3 text-xs font-black uppercase border-2 border-slate-100 rounded-2xl hover:border-indigo-100 hover:text-indigo-600 transition-all"
-          >
-            Archives
-          </button>
-        </div>
+        <button onClick={() => setShowHistory(true)} className="px-6 py-3 text-xs font-black uppercase border-2 border-slate-100 rounded-2xl hover:border-indigo-100 hover:text-indigo-600 transition-all">
+          Archives
+        </button>
       </header>
 
       <main className="flex-grow max-w-6xl mx-auto w-full px-8 py-12">
@@ -378,24 +334,15 @@ const App: React.FC = () => {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thematic Inquiry</label>
-              <button 
-                // Fix typo: rename setShow_examples to setShowExamples
-                onClick={() => setShowExamples(!showExamples)}
-                className="flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
-              >
-                Need inspiration?
-                <ChevronDown className={`ml-2 transition-transform duration-300 ${showExamples ? 'rotate-180' : ''}`} />
+              <button onClick={() => setShowExamples(!showExamples)} className="flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                Inspiration <ChevronDown className={`ml-2 transition-transform duration-300 ${showExamples ? 'rotate-180' : ''}`} />
               </button>
             </div>
             
             {showExamples && (
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-6 bg-slate-50 rounded-3xl animate-in fade-in slide-in-from-top-4 duration-300 border border-slate-100">
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-6 bg-slate-50 rounded-3xl border border-slate-100">
                 {EXAMPLE_QUERIES.map((ex, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => { setQuestion(ex); setShowExamples(false); }}
-                    className="text-left px-5 py-4 text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-white rounded-xl transition-all border border-transparent hover:border-indigo-100 hover:shadow-sm line-clamp-2"
-                  >
+                  <button key={i} onClick={() => { setQuestion(ex); setShowExamples(false); }} className="text-left px-5 py-4 text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-white rounded-xl transition-all">
                     {ex}
                   </button>
                 ))}
@@ -430,47 +377,22 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Analysis Depth</label>
-                <div className="flex items-center space-x-2 text-[8px] font-black uppercase text-indigo-600 animate-pulse">
-                  <ExternalLinkIcon className="w-2 h-2" />
-                  <span>Verified Link Protocol Active</span>
-                </div>
-              </div>
-              <div className="relative group">
-                <select 
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
-                  className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all cursor-pointer"
-                >
-                  <option value="gemini-3-pro-preview">Pro (Highest Accuracy & Verified Evidence)</option>
-                  <option value="gemini-3-flash-preview">Flash (Balanced Speed & Grounding)</option>
-                  <option value="gemini-2.5-flash-lite-latest">Lite (Fast Baseline Summary)</option>
-                </select>
-                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-600 transition-colors">
-                  <ChevronDown />
-                </div>
-              </div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Scholarly Precision</label>
+              <select 
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
+                className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all"
+              >
+                <option value="gemini-3-pro-preview">Pro (Deep Grounding & Verified Research)</option>
+                <option value="gemini-3-flash-preview">Flash (Balanced Context)</option>
+                <option value="gemini-2.5-flash-lite-latest">Lite (Fast Overview)</option>
+              </select>
             </div>
             <div className="flex flex-col justify-end">
-              <button 
-                onClick={handleGenerate} 
-                disabled={isLoading || !question || selectedTraditions.length === 0} 
-                className="w-full py-5 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center space-x-3"
-              >
-                {isLoading ? (
-                   <span className="flex items-center">
-                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                     Auditing Sources...
-                   </span>
-                ) : (
-                  <>
-                    <SparklesIcon />
-                    <span>Generate Evidence-Based Analysis</span>
-                  </>
-                )}
+              <button onClick={handleGenerate} disabled={isLoading || !question || selectedTraditions.length === 0} className="w-full py-5 bg-indigo-600 text-white font-black uppercase text-sm tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50">
+                {isLoading ? "Consulting Primary Sources..." : "Execute Comparative Analysis"}
               </button>
             </div>
           </div>
@@ -480,60 +402,29 @@ const App: React.FC = () => {
           {isLoading && <LoadingSkeleton count={selectedTraditions.length} />}
           
           {currentResult && !isLoading ? (
-            <div className="animate-in fade-in slide-in-from-bottom-12 duration-700">
+            <div className="animate-in">
               <div className="mb-14 border-b-4 border-slate-900 pb-8">
-                <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</div>
                 <h1 className="text-5xl font-black serif mb-4 leading-tight">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} • {currentResult.modelUsed.includes('pro') ? 'High Precision Tier' : 'Standard Tier'}
+                  Research Report • Verified by {currentResult.modelUsed.includes('pro') ? 'Deep Audit' : 'Standard Baseline'}
                 </p>
-                {currentResult.sources && (
-                  <div className="mt-8">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Foundational Web Sources (Verified)</h4>
-                    <div className="flex flex-wrap gap-4">
-                      {currentResult.sources.map((source, sIdx) => (
-                        <a 
-                          key={sIdx} 
-                          href={source.uri} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center space-x-2 bg-slate-100 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-colors border border-transparent hover:border-indigo-100"
-                        >
-                          <span className="text-[10px] font-bold text-slate-700 truncate max-w-[200px]">{source.title}</span>
-                          <ExternalLinkIcon className="text-slate-400" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="fixed bottom-12 right-12 z-[70]">
-                 <button 
-                  onClick={() => setShowDiscussion(true)} 
-                  className="group flex items-center bg-indigo-600 text-white px-10 py-6 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all"
-                 >
-                    <MessageIcon className="mr-3 w-6 h-6" />
-                    <span className="font-black uppercase text-xs">Scholar Dialogue</span>
-                 </button>
               </div>
 
               {(Object.keys(SECTION_LABELS) as SectionKey[]).map((key) => (
                 <div key={key} className="mb-16">
                   <div className="flex items-center space-x-6 mb-8">
-                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">{SECTION_LABELS[key]}</h3>
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">
+                      {SECTION_LABELS[key]}
+                    </h3>
                     <div className="h-px bg-slate-200 w-full" />
                   </div>
                   <div className={`grid gap-10 ${getGridClass(currentResult.selectedTraditions.length)}`}>
                     {currentResult.selectedTraditions.map((tradition) => (
-                      <div 
-                        key={tradition} 
-                        className="flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm hover:shadow-xl transition-shadow relative"
-                      >
-                        <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
+                      <div key={tradition} className={`flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm relative ${key === 'quotes and references' ? 'border-indigo-200 bg-indigo-50/20' : ''}`}>
+                        <div className="absolute top-0 right-10 -translate-y-1/2 bg-slate-900 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
                         </div>
-                        <CustomMarkdown content={currentResult.data[key][tradition] || "Analysis unavailable."} />
+                        <CustomMarkdown content={currentResult.data[key][tradition] || "Reference pending verification."} />
                       </div>
                     ))}
                   </div>
@@ -542,40 +433,31 @@ const App: React.FC = () => {
             </div>
           ) : !isLoading && (
             <div className="text-center py-56 border-4 border-dashed border-slate-200 rounded-[4rem] opacity-30">
-              <p className="text-sm font-black uppercase tracking-[0.5em] text-slate-300">Awaiting Scholarship</p>
+              <p className="text-sm font-black uppercase tracking-[0.5em] text-slate-300">Archive Standby</p>
             </div>
           )}
         </div>
       </main>
 
+      {currentResult && (
+        <div className="fixed bottom-12 right-12 z-[70]">
+          <button onClick={() => setShowDiscussion(true)} className="flex items-center bg-indigo-600 text-white px-10 py-6 rounded-full shadow-2xl hover:scale-110 transition-all">
+            <MessageIcon className="mr-3 w-6 h-6" />
+            <span className="font-black uppercase text-xs">Scholar Dialogue</span>
+          </button>
+        </div>
+      )}
+
       {showHistory && (
         <div className="fixed inset-0 z-[110] flex justify-end" onClick={() => setShowHistory(false)}>
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" />
-          <div 
-            className="relative w-full max-w-md bg-white shadow-2xl flex flex-col p-12 animate-in slide-in-from-right duration-300" 
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-12">
-              <h2 className="text-4xl font-black serif">Archives</h2>
-              <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-900 text-2xl">✕</button>
-            </div>
-            <div className="flex-grow overflow-y-auto space-y-6 pr-4">
-              {history.length === 0 && <p className="text-slate-400 text-center py-20 uppercase text-[10px] font-black tracking-widest">No archives found</p>}
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md bg-white p-12 overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="text-4xl font-black serif mb-10">Archives</h2>
+            <div className="space-y-6">
               {history.map(item => (
-                <button 
-                  key={item.id} 
-                  onClick={() => { setCurrentResult(item); setShowHistory(false); setQuestion(item.question); setSelectedTraditions(item.selectedTraditions); }} 
-                  className="w-full text-left p-10 border-2 border-slate-50 rounded-[2.5rem] hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group"
-                >
-                  <p className="font-bold text-slate-900 line-clamp-2 mb-3 group-hover:text-indigo-600">{item.question}</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
-                      {new Date(item.timestamp).toLocaleDateString()}
-                    </p>
-                    <div className="flex gap-1">
-                      {item.selectedTraditions.map(t => <div key={t} className="w-2 h-2 rounded-full bg-slate-200" title={t} />)}
-                    </div>
-                  </div>
+                <button key={item.id} onClick={() => { setCurrentResult(item); setShowHistory(false); }} className="w-full text-left p-8 border-2 border-slate-50 rounded-[2rem] hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
+                  <p className="font-bold text-slate-900 mb-2">{item.question}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase">{new Date(item.timestamp).toLocaleDateString()}</p>
                 </button>
               ))}
             </div>
@@ -586,50 +468,25 @@ const App: React.FC = () => {
       {showDiscussion && currentResult && (
         <div className="fixed inset-0 z-[100]" onClick={() => setShowDiscussion(false)}>
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div 
-            className="absolute inset-y-0 right-0 max-w-2xl w-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300" 
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-10 border-b flex items-center justify-between bg-indigo-600 text-white shadow-lg">
-              <h2 className="text-2xl font-black serif flex items-center">
-                <MessageIcon className="mr-4 w-8 h-8" />
-                Scholar Dialogue
-              </h2>
-              <button onClick={() => setShowDiscussion(false)} className="p-3 hover:bg-white/10 rounded-full transition-colors text-3xl font-light">✕</button>
+          <div className="absolute inset-y-0 right-0 max-w-2xl w-full bg-white flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-10 border-b flex items-center justify-between bg-indigo-600 text-white">
+              <h2 className="text-2xl font-black serif">Scholar Dialogue</h2>
+              <button onClick={() => setShowDiscussion(false)} className="text-3xl font-light">✕</button>
             </div>
-            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-10 space-y-10 bg-slate-50/50">
+            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-10 space-y-8 bg-slate-50/50">
               {currentResult.chatHistory?.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div 
-                    className={`max-w-[85%] rounded-[2.5rem] p-8 shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'}`}
-                  >
+                  <div className={`max-w-[85%] rounded-[2.5rem] p-8 shadow-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white border text-slate-800 rounded-bl-none'}`}>
                     <CustomMarkdown content={msg.text} isUser={msg.role === 'user'} />
                   </div>
                 </div>
               ))}
-              {isDialogueLoading && (
-                <div className="text-[10px] font-black uppercase text-indigo-600 animate-pulse px-6 tracking-widest">
-                  The scholar is formulating a response...
-                </div>
-              )}
+              {isDialogueLoading && <div className="text-[10px] font-black uppercase text-indigo-600 animate-pulse">Researching...</div>}
             </div>
             <div className="p-10 border-t bg-white">
               <div className="flex space-x-4">
-                <textarea 
-                  rows={2} 
-                  className="flex-grow p-8 text-base border-2 border-slate-100 rounded-[2rem] outline-none focus:border-indigo-500 transition-all resize-none shadow-inner bg-white text-slate-900" 
-                  placeholder="Inquire further..." 
-                  value={dialogueInput} 
-                  onChange={(e) => setDialogueInput(e.target.value)} 
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendDialogue(); } }} 
-                />
-                <button 
-                  onClick={handleSendDialogue} 
-                  disabled={isDialogueLoading || !dialogueInput.trim()} 
-                  className="px-10 bg-indigo-600 text-white font-black uppercase text-xs tracking-[0.2em] rounded-[2rem] shadow-xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all"
-                >
-                  Send
-                </button>
+                <textarea rows={2} className="flex-grow p-8 border-2 border-slate-100 rounded-[2rem] outline-none focus:border-indigo-500 resize-none shadow-inner" placeholder="Inquire further..." value={dialogueInput} onChange={(e) => setDialogueInput(e.target.value)} />
+                <button onClick={handleSendDialogue} disabled={isDialogueLoading || !dialogueInput.trim()} className="px-10 bg-indigo-600 text-white font-black uppercase text-xs rounded-[2rem] shadow-xl">Send</button>
               </div>
             </div>
           </div>
