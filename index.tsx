@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -68,16 +69,23 @@ const SECTION_LABELS: Record<string, string> = {
   'conclusion': 'Final Synthesis'
 };
 
-const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor. Respond ONLY in valid JSON.
-Analyze the provided question from the perspective of each selected tradition.
+const DEFAULT_SYSTEM_PROMPT = `You are a world-class scholarly mentor and ethics researcher. Respond ONLY in valid JSON.
+Your goal is to provide deep, accurate, and multi-perspective analysis grounded in high-quality evidence.
 
-STRICT CONTENT RULES:
-1. 'summary': Provide a MAXIMUM of 1-2 sentences per tradition. Write this section for an 8th-grade reading level.
-2. CITATIONS & HYPERLINKS: Every assertion MUST be bolstered by a clickable Markdown hyperlink to a primary source or scholarly text.
-3. LINK VALIDATION MANDATE: You MUST use the Google Search tool to verify that EVERY URL you provide is currently active, accessible, and leads to the correct resource. 
-4. DEAD LINK RECOVERY: If your first choice for a link is invalid or leads to a 404 error, you MUST search for and provide a working, alternate valid link from a reputable scholarly source.
-5. NO OVERLAP: Each section MUST provide entirely new information. Do not repeat facts.
-6. Format: { "section_name": { "Tradition Name": "Markdown content with verified [Links](URL)..." } }`;
+CRITICAL CITATION GUIDELINES:
+1. RELEVANCE: Links must lead directly to the specific text, scripture, article, or encyclopedia entry that supports your claim. DO NOT link to general homepages (e.g., avoid vatican.va, instead link to the specific Paragraph in the Catechism).
+2. VALIDITY: Use the Google Search tool to verify that every URL is active and correctly points to the cited content. If a link returns a 404 or is irrelevant, you MUST find an alternate scholarly source.
+3. SOURCE TYPES: Prioritize primary scriptures (Sefaria, BibleGateway, Quran.com), academic encyclopedias (Stanford Encyclopedia of Philosophy, Britannica), and peer-reviewed articles.
+4. FORMATTING: Use Markdown: [Specific Article Title or Scripture Verse](URL).
+5. NO HALLUCINATIONS: Do not guess URLs. If you cannot find a direct link for a specific claim using search, find a broader but verified scholarly overview that mentions the claim.
+
+CONTENT RULES:
+- 'summary': 1-2 sentences for an 8th-grade level.
+- 'deep dive': Focus on metaphysical foundations and logic.
+- 'quotes and references': Provide direct excerpts with verified links.
+- NO REPETITION: Each section must offer fresh insights.
+
+Format: { "section_name": { "Tradition Name": "Markdown content with deep-linked [Verified Evidence](URL)..." } }`;
 
 // --- ICONS ---
 const HistoryIcon = ({ className }: { className?: string }) => (
@@ -232,14 +240,18 @@ const App: React.FC = () => {
       };
 
       if (selectedModel === 'gemini-3-pro-preview') {
-        config.thinkingConfig = { thinkingBudget: 8192 };
+        config.thinkingConfig = { thinkingBudget: 16000 };
       }
 
       const response = await ai.models.generateContent({
         model: selectedModel,
-        contents: `Perform a rigorous multi-tradition analysis of: "${question}" for ${selectedTraditions.join(', ')}. 
-        CRITICAL: Use the Google Search tool to verify that every citation link is live and valid. If a link is broken, find a valid alternate. 
-        Each section must be substantial and informative. Ensure summaries are at an 8th-grade level.`,
+        contents: `Perform a deep scholarly analysis of: "${question}" through the lens of: ${selectedTraditions.join(', ')}. 
+        
+        INSTRUCTIONS FOR ACCURACY:
+        1. For every argument, perform a specific Google Search to find a primary source link (scripture, official document, or peer-reviewed article).
+        2. VERIFY the link is specific. For Catholicism, link to the Catechism paragraph. For Stoicism, link to the specific Meditations or Enchiridion chapter.
+        3. AVOID broken or general homepages. If a direct link isn't available, cite a verified academic overview page that explicitly confirms your statement.
+        4. Summaries must remain accessible (8th-grade level), but citations must be expert-tier.`,
         config,
       });
 
@@ -292,7 +304,8 @@ const App: React.FC = () => {
     const updatedHistory = [...(currentResult.chatHistory || []), userMsg];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const context = `You are a mentor. User is asking about: "${currentResult.question}". Focus Traditions: ${currentResult.selectedTraditions.join(', ')}. Context: ${JSON.stringify(currentResult.data).substring(0, 1000)}. Verify all links via search before providing them.`;
+    const context = `You are a scholarly mentor. User is asking about: "${currentResult.question}". traditions: ${currentResult.selectedTraditions.join(', ')}. 
+    Ground your answers in primary sources. Verify every link you provide using Google Search before sending.`;
     
     try {
       const chat = ai.chats.create({ 
@@ -366,6 +379,7 @@ const App: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thematic Inquiry</label>
               <button 
+                // Fix typo: rename setShow_examples to setShowExamples
                 onClick={() => setShowExamples(!showExamples)}
                 className="flex items-center text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
               >
@@ -422,7 +436,7 @@ const App: React.FC = () => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Select Analysis Depth</label>
                 <div className="flex items-center space-x-2 text-[8px] font-black uppercase text-indigo-600 animate-pulse">
                   <ExternalLinkIcon className="w-2 h-2" />
-                  <span>Real-time Link Validation Active</span>
+                  <span>Verified Link Protocol Active</span>
                 </div>
               </div>
               <div className="relative group">
@@ -431,9 +445,9 @@ const App: React.FC = () => {
                   onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
                   className="w-full appearance-none px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 focus:border-indigo-500 outline-none transition-all cursor-pointer"
                 >
-                  <option value="gemini-3-flash-preview">Flash (Faster & Balanced)</option>
-                  <option value="gemini-3-pro-preview">Pro (Slower & Thoughtful Reasoning)</option>
-                  <option value="gemini-2.5-flash-lite-latest">Lite (Ultra Fast Efficiency)</option>
+                  <option value="gemini-3-pro-preview">Pro (Highest Accuracy & Verified Evidence)</option>
+                  <option value="gemini-3-flash-preview">Flash (Balanced Speed & Grounding)</option>
+                  <option value="gemini-2.5-flash-lite-latest">Lite (Fast Baseline Summary)</option>
                 </select>
                 <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-indigo-600 transition-colors">
                   <ChevronDown />
@@ -449,12 +463,12 @@ const App: React.FC = () => {
                 {isLoading ? (
                    <span className="flex items-center">
                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                     Validating Links & Scholars...
+                     Auditing Sources...
                    </span>
                 ) : (
                   <>
                     <SparklesIcon />
-                    <span>Generate Analysis</span>
+                    <span>Generate Evidence-Based Analysis</span>
                   </>
                 )}
               </button>
@@ -471,7 +485,7 @@ const App: React.FC = () => {
                 <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Thematic Inquiry</div>
                 <h1 className="text-5xl font-black serif mb-4 leading-tight">{currentResult.question}</h1>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} • {currentResult.modelUsed.includes('pro') ? 'Deep Tier' : 'Flash Tier'}
+                  Scholarly Report • {new Date(currentResult.timestamp).toLocaleDateString()} • {currentResult.modelUsed.includes('pro') ? 'High Precision Tier' : 'Standard Tier'}
                 </p>
                 {currentResult.sources && (
                   <div className="mt-8">
