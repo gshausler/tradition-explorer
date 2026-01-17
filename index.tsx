@@ -68,10 +68,11 @@ STRICT TONE & READING LEVEL RULES:
 1. 'summary' (Concise Stance): MUST be written at an 8th-grade reading level. Use simple vocabulary and short sentences. No jargon.
 2. ALL OTHER SECTIONS: MUST be written at a College Graduate / Academic Researcher level. Use sophisticated vocabulary and technical terminology.
 
-STRICT CITATION & LINK RULES:
-1. NO LINKS IN CONTENT SECTIONS: DO NOT place any Markdown links, URLs, or bracketed citations in 'summary', 'comparison', 'discussion', 'deep dive', or 'conclusion'. Refer to sources by title only.
-2. CENTRALIZED GLOSSARY: Every single link, URL, and citation MUST be moved to the 'quotes and references' section. 
-3. LINK QUALITY: Use Google Search to find deep-links to specific chapters/verses/articles. No general homepages.
+STRICT CITATION & LINK RULES (LINK MIGRATION):
+1. ZERO LINKS IN ANALYSIS: DO NOT place any Markdown links ([text](url)), raw URLs, or bracketed citations in 'summary', 'comparison', 'discussion', 'deep dive', or 'conclusion'.
+2. CAPTURE AND RELOCATE: If, during your research for the analysis sections, you encounter a relevant primary source URL, citation, or reference link, DO NOT DISCARD IT. You must REMEMBER these links and MOVE them into the 'quotes and references' section.
+3. GLOSSARY CONTENT: The 'quotes and references' section must be a rich repository of all links discovered during the entire generation process. Each link should have a clear title and a brief description of what it supports in the analysis.
+4. LINK QUALITY: Use Google Search to find deep-links to specific chapters/verses/articles. No general homepages.
 
 JSON Structure must strictly follow the provided responseSchema. Each section must contain an entry for every tradition requested.`;
 
@@ -101,13 +102,13 @@ declare global {
 
 // --- HELPERS ---
 const CustomMarkdown: React.FC<{ content: string; isUser?: boolean }> = ({ content, isUser }) => (
-  <div className={`prose prose-sm max-w-none prose-headings:serif prose-headings:text-slate-900 ${isUser ? 'prose-invert' : 'prose-slate text-slate-800'} prose-a:text-indigo-600 prose-a:font-bold prose-a:no-underline hover:prose-a:underline`}>
+  <div className={`prose prose-sm max-w-none break-words overflow-hidden prose-headings:serif prose-headings:text-slate-900 ${isUser ? 'prose-invert' : 'prose-slate text-slate-800'} prose-a:text-indigo-600 prose-a:font-bold prose-a:no-underline hover:prose-a:underline`}>
     <ReactMarkdown 
       remarkPlugins={[remarkGfm]} 
       rehypePlugins={[rehypeSlug]}
       components={{
         a: ({ node, ...props }) => (
-          <a {...props} target="_blank" rel="noopener noreferrer" />
+          <a {...props} className="break-all md:break-words" target="_blank" rel="noopener noreferrer" />
         )
       }}
     >
@@ -216,15 +217,13 @@ const App: React.FC = () => {
         
         Mandatory:
         - Summary: 8th grade.
-        - Others: Academic graduate level.
-        - NO links in analysis.
-        - ALL verified links in 'quotes and references'.`,
+        - Analysis sections: Academic graduate level.
+        - IMPORTANT: Remember all source links found during analysis and move them into the 'quotes and references' section. Analysis sections must contain NO links.`,
         config: {
           systemInstruction: DEFAULT_SYSTEM_PROMPT,
           responseMimeType: "application/json",
           responseSchema: responseSchema,
           tools: [{ googleSearch: {} }],
-          // Removing thinking budget entirely to prevent proxy deadline errors (500)
         },
       });
 
@@ -404,7 +403,7 @@ const App: React.FC = () => {
                   </div>
                   <div className={`grid gap-10 ${getGridClass(currentResult.selectedTraditions.length)}`}>
                     {currentResult.selectedTraditions.map((tradition) => (
-                      <div key={tradition} className={`flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm relative ${key === 'quotes and references' ? 'border-indigo-200 bg-indigo-50/20' : ''}`}>
+                      <div key={tradition} className={`flex flex-col p-10 border-2 rounded-[2.5rem] bg-white border-slate-50 shadow-sm relative min-w-0 ${key === 'quotes and references' ? 'border-indigo-200 bg-indigo-50/20' : ''}`}>
                         <div className="absolute top-0 right-10 -translate-y-1/2 bg-slate-900 text-white px-5 py-2 text-[8px] font-black uppercase tracking-widest rounded-full">
                           {tradition}
                         </div>
